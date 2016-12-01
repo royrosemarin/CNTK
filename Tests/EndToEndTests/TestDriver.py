@@ -677,6 +677,8 @@ def runCommand(args):
 
   convertPythonPath = lambda path: os.pathsep.join([cygpath(y) for y in path.split(',')])
   pyPaths = {}
+  if args.py27_path:
+    pyPaths['py27'] = convertPythonPath(args.py27_path)
   if args.py34_path:
     pyPaths['py34'] = convertPythonPath(args.py34_path)
   if args.py35_path:
@@ -784,6 +786,7 @@ if __name__ == "__main__":
   runSubparser.add_argument("-d", "--device", help="cpu|gpu - run on a specified device")
   runSubparser.add_argument("-f", "--flavor", help="release|debug - run only a specified flavor")
   runSubparser.add_argument("-s", "--build-sku", default=defaultBuildSKU, help="cpu|gpu|1bitsgd - run tests only for a specified build SKU")
+  runSubparser.add_argument("--py27-path", help="comma-separated paths to prepend when running a test against Python 2.7")
   runSubparser.add_argument("--py34-path", help="comma-separated paths to prepend when running a test against Python 3.4")
   runSubparser.add_argument("--py35-path", help="comma-separated paths to prepend when running a test against Python 3.5")
   tmpDir = os.getenv("TEMP") if windows else "/tmp"
