@@ -274,20 +274,11 @@ public:
 
         if (useParallelTrain && !evalNodesWhichAccumulateResult.empty())
         {
-            // Each node contains accumulated values for part of the data set, we have to aggregate accumulated values.
-            AggregateAccumulatorValuesAndUpdateEvaluation<ElemType>(m_net, evalNodesWhichAccumulateResult, m_gradHeader,
-                                                                    m_mpi);
-
-            // After values of accumulators have been aggregated accross nodes, we have to update evaluation results for
-            // evaluation nodes that accumulate results.
-            for (size_t i = 0; i < evalNodes.size(); ++i)
-            {
-                if (ContainsAccumulatedResult(evalNodes[i]))
-                    // We don't accumulate error in epoch criterion as this node has already accumulated error for all
-                    // samples that passed through network in forward pass. Using 1 as number of samples as epoch error
-                    // should not be averaged again.
-                    evalResults[i] = localEpochEvalErrors.Assign(i, 1).GetCriterion(i);
-            }
+            // Each worker contains accumulated values for part of the data set, we have to aggregate accumulated values
+            // and recalculate evaluation errors based on accumulators.
+            AggregateAccumulatorValuesAndUpdateEpochEvaluation<ElemType>(
+                m_net, evalNodesWhichAccumulateResult, m_gradHeader, m_mpi, evalResults, evalNodes,
+                localEpochEvalErrors, ContainsAccumulatedResult);
         }
 
         // final statistics

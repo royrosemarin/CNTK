@@ -1508,23 +1508,11 @@ size_t SGD<ElemType>::TrainOneEpoch(ComputationNetworkPtr net,
 
     if (useGradientAggregation && !evaluationNodesWhichAccumulateResult.empty())
     {
-        // Each node contains accumulated values for part of the data set, we have to aggregate accumulated values.
-        AggregateAccumulatorValuesAndUpdateEvaluation<ElemType>(net, evaluationNodesWhichAccumulateResult, m_gradHeader,
-                                                                m_mpi);
-
-        // After values of accumulators have been aggregated accross nodes, we have to update evaluation results for
-        // evaluation nodes that accumulate results.
-        for (size_t i = 0; i < epochEvalErrors.size(); i++)
-        {
-            if (ContainsAccumulatedResult(evaluationNodes[i]))
-            {
-                // We don't accumulate error in epoch criterion as this node has already accumulated error for all
-                // samples that passed through network in forward pass.
-                // Since accumulators already average error, we use 1 as number of samples to avoid averaging again.
-                localEpochEvalErrors.Assign(i, 1);
-                epochEvalErrors[i] = localEpochEvalErrors.GetCriterion(i);
-            }
-        }
+        // Each worker contains accumulated values for part of the data set, we have to aggregate accumulated values
+        // and recalculate evaluation errors based on accumulators.
+        AggregateAccumulatorValuesAndUpdateEpochEvaluation<ElemType>(
+            net, evaluationNodesWhichAccumulateResult, m_gradHeader, m_mpi, epochEvalErrors, evaluationNodes,
+            localEpochEvalErrors, ContainsAccumulatedResult);
     }
 
     return totalEpochSamples;

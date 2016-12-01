@@ -4,12 +4,14 @@
 //
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <set>
 
 #pragma warning(push)
 #pragma warning(disable : 4996) // Due to multiple unsafe functions in fileutil.h
 #include "ComputationNetwork.h"
+#include "Criterion.h"
 #include "DistGradHeader.h"
 #include "LinearAlgebraNodes.h"
 #include "MPIWrapper.h"
@@ -93,5 +95,47 @@ void AggregateAccumulatorValuesAndUpdateEvaluation(
     // Update output values of nodes between accumulator nodes and evaluation nodes.
     net->ForwardProp(evalNodesWhichAccumulateResult);
 }
+
+template <typename ElemType>
+void UpdateEpochEvaluationForAccumulatedResult(
+    std::vector<EpochCriterion>& epochEvalErrors,
+    const std::vector<ComputationNodeBasePtr>& evaluationNodes,
+    CriterionAccumulator<ElemType> localEpochEvalErrors,
+    std::function<bool(ComputationNodeBasePtr)> containsAccumulatedResult
+    )
+{
+    for (size_t i = 0; i < epochEvalErrors.size(); i++)
+    {
+        if (containsAccumulatedResult(evaluationNodes[i]))
+        {
+            // We don't accumulate error in epoch criterion as this node has already accumulated error for all
+            // samples that passed through network in forward pass.
+            // Since accumulators already average error, we use 1 as number of samples to avoid averaging again.
+            localEpochEvalErrors.Assign(i, 1);
+            epochEvalErrors[i] = localEpochEvalErrors.GetCriterion(i);
+        }
+    }
+}
+
+template <typename ElemType>
+void AggregateAccumulatorValuesAndUpdateEpochEvaluation(
+    std::shared_ptr<ComputationNetwork> net,
+    std::set<std::shared_ptr<ComputationNodeBase>> evalNodesWhichAccumulateResult,
+    std::shared_ptr<DistGradHeader> gradHeader,
+    std::shared_ptr<MPIWrapper> mpi,
+    std::vector<EpochCriterion>& epochEvalErrors,
+    const std::vector<ComputationNodeBasePtr>& evaluationNodes,
+    CriterionAccumulator<ElemType> localEpochEvalErrors,
+    std::function<bool(ComputationNodeBasePtr)> containsAccumulatedResult)
+{
+    // Each node contains accumulated values for part of the data set, we have to aggregate accumulated values.
+    AggregateAccumulatorValuesAndUpdateEvaluation<ElemType>(net, evalNodesWhichAccumulateResult, gradHeader, mpi);
+
+    // After values of accumulators have been aggregated accross nodes, we have to update evaluation results for
+    // evaluation nodes that accumulate results.
+    UpdateEpochEvaluationForAccumulatedResult<ElemType>(epochEvalErrors, evaluationNodes, localEpochEvalErrors,
+                                                        containsAccumulatedResult);
+}
+
 }}}
 #pragma warning(pop)
