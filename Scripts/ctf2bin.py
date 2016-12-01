@@ -43,7 +43,7 @@ class Converter(object):
 
     def appendSample(self, sample):
         if( len(sample) != self.sampleDim ):
-            print "Invalid sample dimension for input {0}".format( self.name )
+            print( "Invalid sample dimension for input {0}" ).format( self.name )
             sys.exit()
         if( len(self.vals) == 0 ):
             self.vals.append( list() )
@@ -80,7 +80,7 @@ class DenseConverter(Converter):
         output = ""
         for sequence in self.vals:
             if( len(sequence) != 1 ):
-                print "Converter does not support dense sequences."
+                print( "Converter does not support dense sequences." )
                 sys.exit()
             for sample in sequence[0]:
                 output += struct.pack( "f", float(sample) )
@@ -96,7 +96,7 @@ class SparseConverter(Converter):
     def appendSample(self, sample):
         for samp in sample:
             if( int(samp.split(":")[0]) >= self.sampleDim ):
-                print "Invalid sample dimension for input {0}. Max {1}, given {2}".format( self.name, self.sampleDim, sample.split( ":" )[0] )
+                print( "Invalid sample dimension for input {0}. Max {1}, given {2}" ).format( self.name, self.sampleDim, sample.split( ":" )[0] )
                 sys.exit()
         if( len(self.vals) == 0 ):
             self.vals.append( list() )
@@ -174,7 +174,7 @@ def GetConverter( inputtype, name, sampleDim ):
     elif( inputtype.lower() == 'sparse' ):
         converter = SparseConverter( name, sampleDim )
     else:
-        print 'Invalid input format {0}'.format( inputtype )
+        print( 'Invalid input format {0}' ).format( inputtype )
         sys.exit()
 
     return converter 
