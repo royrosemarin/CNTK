@@ -14,25 +14,6 @@ using namespace Microsoft::MSR::CNTK;
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
-// A thin wrapper around CNTK text format reader
-class CNTKBinaryReaderTestRunner
-{
-    BinaryChunkDeserializer m_deserializer;
-
-public:
-    ChunkPtr m_chunk;
-
-    CNTKBinaryReaderTestRunner(const string& filename) :
-        m_deserializer(wstring(filename.begin(), filename.end()))
-    {
-    }
-    // Retrieves a chunk of data.
-    void LoadChunk()
-    {
-        m_chunk = m_deserializer.GetChunk(0);
-    }
-};
-
 namespace Test {
 
 struct CNTKBinaryReaderFixture : ReaderFixture

@@ -1,4 +1,21 @@
+#!/usr/bin/env python
+
+# This script takes a CNTK text format file and a header file, and converts it
+# to a CNTK binary format file.
+#
+# The header file must list all of the streams in the input file in the
+# following format:
+#   <desired stream name> TAB <stream alias> TAB <matrix type> TAB <sample dimension>
+#
+# Where:
+#   <desired stream name> is the desired name for the input in CNTK.
+#   <stream alias> is the alias for the stream in the input file.
+#   <matrix type> is the matrix type, i.e., dense or sparse
+#   <sample dimension> is the dimensino of each sample for the input
+#
+
 import sys
+import argparse
 import re
 import struct
 import tempfile
@@ -195,23 +212,26 @@ def OutputOffset( headerFile, numBytes, numSeqs, numSamples ):
     headerFile.write( struct.pack( "i", numSamples ) )
 
 if __name__ == '__main__':
-    if( len(sys.argv) != 5 ):
-        print 'Invalid usage. Expected: ', sys.argv[0], ' <ctf file> <header file> <num sequences per chunk> <bin file>'
-        sys.exit()
+    parser = argparse.ArgumentParser(description="Transforms a CNTK Text Format file into CNTK binary format given a header.")
+    parser.add_argument('--input', help="CNTK Text Format file to convert to binary.", default="", required=True)
+    parser.add_argument('--header',  help="Header file describing each stream in the input.", default="", required=True)
+    parser.add_argument('--seqsPerChunk', type=int, help='Number of sequences in each chunk.', default="", required=True)
+    parser.add_argument('--output', help='Name of the output file, stdout if not given', default="", required=True)
+    args = parser.parse_args()
 
     # Since we don't know how many chunks we're going to write until we're done,
     # grow the header/offsets table and the data portion separately. then at the
     # end concatenate the data portion onto the end of the header/offsets
     # portion.
-    headerFile = open( sys.argv[4], "wb+" )
-    dataFile = tempfile.NamedTemporaryFile(mode="rb+", delete=False)
-    dataPath = dataFile.name
+    binaryHeaderFile = open( args.output, "wb+" )
+    binaryDataFile = tempfile.NamedTemporaryFile(mode="rb+", delete=False)
+    dataPath = binaryDataFile.name
 
     # parse the header to get the converters for this file
     # <name>    <alias>  <input format>  <sample size>
     converters = []
     aliasToId = dict()
-    with open( sys.argv[2], "r" ) as headerfile:
+    with open( args.header, "r" ) as headerfile:
         id = 0
         for line in headerfile:
             split = re.split(r'\t+', line.strip())
@@ -219,15 +239,15 @@ if __name__ == '__main__':
             aliasToId[ split[ 1 ] ] = id
             id += 1
 
-    OutputHeader( headerFile, converters )
+    OutputHeader( binaryHeaderFile, converters )
 
     numChunks = 0
-    with open( sys.argv[1], "r" ) as datafile:
+    with open( args.input, "r" ) as inputFile:
         curSequence = list()
         numSeqs = 0
         numSamps = 0
         prevId = None
-        for line in datafile:
+        for line in inputFile:
             split = line.rstrip().split('|')
             # if the sequence id is empty or not equal to the previous sequence id,
             # we are at a new sequence.
@@ -236,10 +256,10 @@ if __name__ == '__main__':
                     numSamps += ParseSequence( aliasToId, curSequence, converters )
                     curSequence = list()
                     numSeqs += 1
-                    if( numSeqs % int( sys.argv[3] ) == 0 ):
-                        numBytes = OutputChunk( dataFile, converters )
+                    if( numSeqs % int( args.seqsPerChunk ) == 0 ):
+                        numBytes = OutputChunk( binaryDataFile, converters )
                         numChunks += 1
-                        OutputOffset( headerFile, numBytes, numSeqs, numSamps )
+                        OutputOffset( binaryHeaderFile, numBytes, numSeqs, numSamps )
                         numSeqs = 0
                         numSamps = 0
                 prevId = split[ 0 ]
@@ -251,16 +271,16 @@ if __name__ == '__main__':
             numSeqs += 1
             numChunks += 1
 
-        numBytes = OutputChunk( dataFile, converters )
-        OutputOffset( headerFile, numBytes, numSeqs, numSamps )
+        numBytes = OutputChunk( binaryDataFile, converters )
+        OutputOffset( binaryHeaderFile, numBytes, numSeqs, numSamps )
 
-        UpdateHeader( headerFile, numChunks )
-        headerFile.flush()
-        dataFile.flush()
-        headerFile.close()
-        dataFile.close()
+        UpdateHeader( binaryHeaderFile, numChunks )
+        binaryHeaderFile.flush()
+        binaryDataFile.flush()
+        binaryHeaderFile.close()
+        binaryDataFile.close()
 
-        destination = open( sys.argv[4], 'awb+' )
+        destination = open( args.output, 'awb+' )
         shutil.copyfileobj( open( dataPath, "rb" ), destination )
         
         destination.flush()
